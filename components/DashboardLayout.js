@@ -26,7 +26,9 @@ export default function DashboardLayout({ children }) {
       {/* Sidebar */}
       <aside className="w-64 flex-shrink-0 border-r border-gray-800 bg-gray-900/50 backdrop-blur-xl">
         <div className="flex h-16 items-center px-6 border-b border-gray-800">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Chat System</h1>
+          <Link href="/" className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent hover:opacity-90 transition-opacity">
+            Chat System
+          </Link>
         </div>
         <nav className="mt-6 flex flex-col gap-2 px-4">
           <Link href="/dashboard" className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">

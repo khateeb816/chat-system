@@ -49,9 +49,9 @@ export default function Register() {
 
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-gray-900/60 p-8 shadow-2xl backdrop-blur-xl border border-gray-800 relative z-10">
         <div className="text-center">
-          <div className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+          <Link href="/" className="inline-block text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent mb-2 hover:opacity-90 transition-opacity">
             Chat System
-          </div>
+          </Link>
           <h2 className="text-3xl font-extrabold text-white">Create an account</h2>
           <p className="mt-2 text-sm text-gray-400">Start building your Q&A sequences</p>
         </div>

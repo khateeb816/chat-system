@@ -45,9 +45,9 @@ export default function Home() {
       
       {/* Header */}
       <header className="absolute top-0 w-full flex items-center justify-between px-8 py-6 z-10">
-        <div className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+        <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent hover:opacity-90 transition-opacity">
           Chat System
-        </div>
+        </Link>
         <nav className="flex items-center gap-6">
           {loading ? (
             <div className="h-8 w-20 bg-gray-800 rounded-full animate-pulse"></div>
