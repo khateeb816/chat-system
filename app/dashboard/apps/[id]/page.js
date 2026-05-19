@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, Trash2, Edit2, Play, RotateCcw, Copy, Search, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Play, RotateCcw, Copy, Search, X, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AppDetail() {
@@ -20,6 +20,13 @@ export default function AppDetail() {
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [questionText, setQuestionText] = useState('');
   const [answers, setAnswers] = useState(['']);
+
+  // Import states
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importPreview, setImportPreview] = useState([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Loading states for actions
   const [isResetting, setIsResetting] = useState(false);
@@ -42,6 +49,98 @@ export default function AppDetail() {
   useEffect(() => {
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    if (!importText.trim()) {
+      setImportPreview([]);
+      setImportError('');
+      return;
+    }
+
+    try {
+      let cleaned = importText.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+      const start = cleaned.indexOf('[');
+      const end = cleaned.lastIndexOf(']');
+      if (start === -1 || end === -1) {
+        throw new Error('Could not find array brackets [ ] in the input');
+      }
+
+      const arrayStr = cleaned.slice(start, end + 1);
+
+      let jsonStr = arrayStr
+        .replace(/([{,]\s*)(text|question|answers|options)(\s*:)/g, (match, p1, p2, p3) => {
+          let key = p2;
+          if (key === 'question') key = 'text';
+          if (key === 'options') key = 'answers';
+          return `${p1}"${key}"${p3}`;
+        })
+        .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (match, p1) => {
+          const escaped = p1.replace(/"/g, '\\"').replace(/\\'/g, "'");
+          return `"${escaped}"`;
+        })
+        .replace(/,\s*([\]}])/g, '$1');
+
+      let parsed = null;
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch (jsonErr) {
+        const suspiciousKeywords = ['window', 'document', 'fetch', 'cookie', 'localStorage', 'sessionStorage', 'XMLHttpRequest', 'eval', 'prototype', '__proto__', 'process', 'require', 'import'];
+        for (const word of suspiciousKeywords) {
+          if (cleaned.includes(word)) {
+            throw new Error(`Security restriction: input contains disallowed keyword "${word}"`);
+          }
+        }
+
+        const evaluator = new Function(`return (${arrayStr})`);
+        parsed = evaluator();
+      }
+
+      if (!Array.isArray(parsed)) {
+        throw new Error('Parsed object is not an array');
+      }
+
+      const validated = parsed.map((item, idx) => {
+        const text = item.text || item.question;
+        const rawAnswers = item.answers || item.options || [];
+        if (!text) {
+          throw new Error(`Item at index ${idx} is missing "text" or "question" field`);
+        }
+        if (!Array.isArray(rawAnswers)) {
+          throw new Error(`Item at index ${idx} "answers" must be an array`);
+        }
+        return {
+          text,
+          answers: rawAnswers.map((a, aidx) => {
+            if (typeof a === 'string') return { text: a, sortOrder: aidx };
+            return { text: a.text || '', sortOrder: a.sortOrder !== undefined ? a.sortOrder : aidx };
+          })
+        };
+      });
+
+      setImportPreview(validated);
+      setImportError('');
+    } catch (err) {
+      setImportPreview([]);
+      setImportError(err.message);
+    }
+  }, [importText]);
+
+  const handleImport = async () => {
+    if (isImporting || importPreview.length === 0) return;
+    setIsImporting(true);
+    try {
+      await api.post(`/questions/app/${id}/bulk`, { questions: importPreview });
+      toast.success(`Successfully imported ${importPreview.length} questions`);
+      setIsImportModalOpen(false);
+      setImportText('');
+      setImportPreview([]);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to import questions');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -242,9 +341,17 @@ export default function AppDetail() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-white">Questions & Answers Sequence</h2>
-          <button onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
-            <Plus size={16} /> Add Question
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-gray-800 border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+            >
+              <Upload size={16} /> Import
+            </button>
+            <button onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+              <Plus size={16} /> Add Question
+            </button>
+          </div>
         </div>
 
         {/* Search & Filters */}
@@ -429,6 +536,143 @@ export default function AppDetail() {
                   </>
                 ) : (
                   'Save Question'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-gray-900 border border-gray-800 p-6 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-white">Import Questions Sequence</h3>
+              <button 
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportText('');
+                  setImportError('');
+                  setImportPreview([]);
+                }} 
+                className="text-gray-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+              <div>
+                <p className="text-sm text-gray-400 mb-2">
+                  Paste a JavaScript array or JSON containing questions and answers. Keys can be <code>text</code> (or <code>question</code>) and <code>answers</code> (or <code>options</code>).
+                </p>
+                
+                {/* Code Sample */}
+                <div className="bg-gray-950 rounded-lg p-3 border border-gray-800 relative group">
+                  <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => {
+                        const sampleCode = `const questions = [
+  {
+    text: "Arc upgrade pehle karni chahiye ya modules?",
+    answers: [
+      "Mujhe lagta hai Arc pehle important hoti hai",
+      "Modules ke bina Arc ka full benefit nahi milta",
+      "Early game mein modules better lagte hain honestly",
+      "Balanced upgrade karna zyada useful hota hai"
+    ]
+  }
+]`;
+                        navigator.clipboard.writeText(sampleCode);
+                        toast.success('Sample copied to clipboard');
+                      }}
+                      className="flex items-center gap-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded border border-gray-700 transition-colors"
+                    >
+                      <Copy size={12} /> Copy Sample
+                    </button>
+                  </div>
+                  <pre className="text-xs text-indigo-300 font-mono overflow-x-auto whitespace-pre">
+{`const questions = [
+  {
+    text: "Arc upgrade pehle karni chahiye ya modules?",
+    answers: [
+      "Mujhe lagta hai Arc pehle important hoti hai",
+      "Modules ke bina Arc ka full benefit nahi milta",
+      "Early game mein modules better lagte hain honestly",
+      "Balanced upgrade karna zyada useful hota hai"
+    ]
+  }
+]`}
+                  </pre>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Paste JavaScript or JSON</label>
+                <textarea
+                  value={importText}
+                  onChange={e => setImportText(e.target.value)}
+                  className="w-full h-48 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-white font-mono text-xs focus:border-indigo-500 focus:outline-none resize-none"
+                  placeholder="Paste questions here..."
+                />
+              </div>
+
+              {/* Status / Preview */}
+              {importError && (
+                <div className="rounded-lg bg-red-950/30 border border-red-900/50 p-3 text-xs text-red-400 font-sans">
+                  <strong>Error parsing input:</strong> {importError}
+                </div>
+              )}
+
+              {importPreview.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    Ready to import {importPreview.length} questions:
+                  </div>
+                  <div className="border border-gray-800 bg-gray-950/50 rounded-lg max-h-40 overflow-y-auto p-3 space-y-2 text-xs">
+                    {importPreview.map((q, idx) => (
+                      <div key={idx} className="border-b border-gray-900 last:border-0 pb-2 last:pb-0">
+                        <div className="font-semibold text-indigo-400">{idx + 1}. {q.text}</div>
+                        <div className="pl-4 text-gray-500">
+                          Answers: {q.answers.map(a => a.text).join(' | ')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-800">
+              <button
+                disabled={isImporting}
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportText('');
+                  setImportError('');
+                  setImportPreview([]);
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isImporting || importPreview.length === 0}
+                onClick={handleImport}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isImporting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    Importing...
+                  </>
+                ) : (
+                  `Import ${importPreview.length} Questions`
                 )}
               </button>
             </div>
