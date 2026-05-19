@@ -17,7 +17,12 @@ export default function Login() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to login');
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Failed to login';
+      if (errMsg.includes('default credentials')) {
+        setError('Firebase credentials missing. Please set the FIREBASE_SERVICE_ACCOUNT environment variable in Vercel settings.');
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setLoading(false);
     }

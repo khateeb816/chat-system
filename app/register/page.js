@@ -6,6 +6,7 @@ import Link from 'next/link';
 export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const { register } = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,11 +14,27 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
     setLoading(true);
     try {
       await register(email, password);
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to register');
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Failed to register';
+      if (errMsg.includes('default credentials')) {
+        setError('Firebase credentials missing. Please set the FIREBASE_SERVICE_ACCOUNT environment variable in Vercel settings.');
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -65,6 +82,17 @@ export default function Register() {
                 placeholder="Min. 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Confirm password</label>
+              <input
+                type="password"
+                required
+                className="w-full appearance-none rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm transition-colors"
+                placeholder="Repeat password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </div>
           </div>
