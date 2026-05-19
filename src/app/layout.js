@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Q&A Sequence App",
+  title: "Chat System",
   description: "A SaaS system for sequential questions and answers",
 };
 
