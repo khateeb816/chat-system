@@ -408,10 +408,10 @@ export default function AppDetail() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-white">Questions & Answers Sequence</h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-gray-800 border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-2 rounded-lg bg-gray-800 border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors whitespace-nowrap"
             >
               <Upload size={16} /> Import
             </button>
@@ -420,7 +420,7 @@ export default function AppDetail() {
             <div className="relative" onBlur={() => setTimeout(() => setIsExportDropdownOpen(false), 200)}>
               <button
                 onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                className="flex items-center gap-2 rounded-lg bg-gray-800 border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+                className="flex items-center gap-2 rounded-lg bg-gray-800 border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors whitespace-nowrap"
               >
                 <Download size={16} /> Export
               </button>
@@ -442,7 +442,7 @@ export default function AppDetail() {
               )}
             </div>
 
-            <button onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+            <button onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-indigo-600 border border-transparent px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors whitespace-nowrap">
               <Plus size={16} /> Add Question
             </button>
           </div>
@@ -729,9 +729,14 @@ export default function AppDetail() {
                     {importPreview.map((q, idx) => (
                       <div key={idx} className="border-b border-gray-900 last:border-0 pb-2 last:pb-0">
                         <div className="font-semibold text-indigo-400">{idx + 1}. {q.text}</div>
-                        <div className="pl-4 text-gray-500">
-                          Answers: {q.answers.map(a => a.text).join(' | ')}
-                        </div>
+                        <ul className="pl-4 mt-1 space-y-0.5 list-none">
+                          {q.answers.map((a, aIdx) => (
+                            <li key={aIdx} className="flex items-start gap-1.5 text-gray-400">
+                              <span className="mt-0.5 shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-600/70 inline-block"></span>
+                              <span>{a.text || a}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     ))}
                   </div>

@@ -56,6 +56,10 @@ export default function AdminDashboard() {
   const [logSearch, setLogSearch] = useState('');
   const [logRequestTypeFilter, setLogRequestTypeFilter] = useState('all');
   const [logReturnedTypeFilter, setLogReturnedTypeFilter] = useState('all');
+  const [logSortColumn, setLogSortColumn] = useState('timestamp');
+  const [logSortDirection, setLogSortDirection] = useState('desc');
+  const [logCurrentPage, setLogCurrentPage] = useState(1);
+  const [logRowsPerPage, setLogRowsPerPage] = useState(10);
 
   // Sessions Tab Filters
   const [sessionSearch, setSessionSearch] = useState('');
@@ -69,6 +73,10 @@ export default function AdminDashboard() {
     setLogSearch('');
     setLogRequestTypeFilter('all');
     setLogReturnedTypeFilter('all');
+    setLogSortColumn('timestamp');
+    setLogSortDirection('desc');
+    setLogCurrentPage(1);
+    setLogRowsPerPage(10);
     setSessionSearch('');
     setSessionModeFilter('all');
     setUserSearch('');
@@ -805,11 +813,30 @@ export default function AdminDashboard() {
 
           {/* REQUEST LOGS TAB */}
           {activeTab === 'logs' && (() => {
+            const handleLogSort = (columnName) => {
+              if (logSortColumn === columnName) {
+                setLogSortDirection(logSortDirection === 'asc' ? 'desc' : 'asc');
+              } else {
+                setLogSortColumn(columnName);
+                setLogSortDirection('asc');
+              }
+              setLogCurrentPage(1);
+            };
+
+            const renderLogSortIcon = (columnName) => {
+              if (logSortColumn !== columnName) return <ArrowUpDown size={13} className="text-gray-500 ml-1.5 inline" />;
+              return logSortDirection === 'asc' 
+                ? <span className="text-indigo-400 ml-1.5 font-bold">▲</span> 
+                : <span className="text-indigo-400 ml-1.5 font-bold">▼</span>;
+            };
+
             const filteredLogs = logs.filter(log => {
               const query = logSearch.toLowerCase();
               const matchesSearch = (log.appName && log.appName.toLowerCase().includes(query)) ||
                 (log.agentId && log.agentId.toLowerCase().includes(query)) ||
                 (log.ip && log.ip.toLowerCase().includes(query)) ||
+                (log.returnedQuestionText && log.returnedQuestionText.toLowerCase().includes(query)) ||
+                (log.returnedAnswerText && log.returnedAnswerText.toLowerCase().includes(query)) ||
                 (log.returnedQuestionIndex !== undefined && `q: ${log.returnedQuestionIndex}`.includes(query)) ||
                 (log.returnedAnswerIndex !== undefined && `a: ${log.returnedAnswerIndex}`.includes(query));
                 
@@ -818,6 +845,30 @@ export default function AdminDashboard() {
               
               return matchesSearch && matchesRequestType && matchesReturnedType;
             });
+
+            const sortedLogs = [...filteredLogs].sort((a, b) => {
+              let aVal = a[logSortColumn] ?? '';
+              let bVal = b[logSortColumn] ?? '';
+              
+              if (logSortColumn === 'timestamp') {
+                aVal = aVal ? new Date(aVal).getTime() : 0;
+                bVal = bVal ? new Date(bVal).getTime() : 0;
+              } else {
+                aVal = String(aVal).toLowerCase();
+                bVal = String(bVal).toLowerCase();
+              }
+
+              if (aVal < bVal) return logSortDirection === 'asc' ? -1 : 1;
+              if (aVal > bVal) return logSortDirection === 'asc' ? 1 : -1;
+              return 0;
+            });
+
+            // Pagination Calculations
+            const totalLogs = sortedLogs.length;
+            const totalPages = Math.ceil(totalLogs / logRowsPerPage) || 1;
+            const currentPage = Math.min(logCurrentPage, totalPages);
+            const startIndex = (currentPage - 1) * logRowsPerPage;
+            const paginatedLogs = sortedLogs.slice(startIndex, startIndex + logRowsPerPage);
 
             return (
               <div className="space-y-4">
@@ -828,14 +879,20 @@ export default function AdminDashboard() {
                       <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
                       <input
                         type="text"
-                        placeholder="Search logs by app, agent, IP, index..."
+                        placeholder="Search logs by app, agent, IP, index, QA..."
                         className="w-full pl-9 pr-8 py-2 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300 placeholder:text-gray-500 focus:border-indigo-500 focus:outline-none transition-colors"
                         value={logSearch}
-                        onChange={(e) => setLogSearch(e.target.value)}
+                        onChange={(e) => {
+                          setLogSearch(e.target.value);
+                          setLogCurrentPage(1);
+                        }}
                       />
                       {logSearch && (
                         <button
-                          onClick={() => setLogSearch('')}
+                          onClick={() => {
+                            setLogSearch('');
+                            setLogCurrentPage(1);
+                          }}
                           className="absolute right-3 top-2.5 text-gray-500 hover:text-white transition-colors"
                         >
                           <X size={16} />
@@ -847,7 +904,10 @@ export default function AdminDashboard() {
                         <span className="text-xs text-gray-400 font-medium">Req Type:</span>
                         <select
                           value={logRequestTypeFilter}
-                          onChange={(e) => setLogRequestTypeFilter(e.target.value)}
+                          onChange={(e) => {
+                            setLogRequestTypeFilter(e.target.value);
+                            setLogCurrentPage(1);
+                          }}
                           className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-300 focus:border-indigo-500 focus:outline-none transition-colors cursor-pointer"
                         >
                           <option value="all">All Request Types</option>
@@ -859,7 +919,10 @@ export default function AdminDashboard() {
                         <span className="text-xs text-gray-400 font-medium">Ret Type:</span>
                         <select
                           value={logReturnedTypeFilter}
-                          onChange={(e) => setLogReturnedTypeFilter(e.target.value)}
+                          onChange={(e) => {
+                            setLogReturnedTypeFilter(e.target.value);
+                            setLogCurrentPage(1);
+                          }}
                           className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-300 focus:border-indigo-500 focus:outline-none transition-colors cursor-pointer"
                         >
                           <option value="all">All Returned Types</option>
@@ -874,26 +937,39 @@ export default function AdminDashboard() {
                 </div>
                 <div className="overflow-x-auto rounded-xl border border-gray-800 bg-gray-900/30 backdrop-blur-sm">
                   <table className="w-full text-left text-sm text-gray-300">
-                    <thead className="bg-gray-800/40 text-gray-400 border-b border-gray-850">
+                    <thead className="bg-gray-800/40 text-gray-400 border-b border-gray-850 select-none">
                       <tr>
-                        <th className="px-6 py-4 font-medium">Timestamp</th>
-                        <th className="px-6 py-4 font-medium">App Name</th>
-                        <th className="px-6 py-4 font-medium">Agent ID</th>
-                        <th className="px-6 py-4 font-medium">Request</th>
-                        <th className="px-6 py-4 font-medium">Returned Type</th>
+                        <th onClick={() => handleLogSort('timestamp')} className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors">
+                          Timestamp {renderLogSortIcon('timestamp')}
+                        </th>
+                        <th onClick={() => handleLogSort('appName')} className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors">
+                          App Name {renderLogSortIcon('appName')}
+                        </th>
+                        <th onClick={() => handleLogSort('agentId')} className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors">
+                          Agent ID {renderLogSortIcon('agentId')}
+                        </th>
+                        <th onClick={() => handleLogSort('requestType')} className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors">
+                          Request {renderLogSortIcon('requestType')}
+                        </th>
+                        <th onClick={() => handleLogSort('returnedType')} className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors">
+                          Returned Type {renderLogSortIcon('returnedType')}
+                        </th>
+                        <th className="px-6 py-4 font-medium">Q/A Details</th>
                         <th className="px-6 py-4 font-medium">Index Metadata</th>
-                        <th className="px-6 py-4 font-medium">IP Address</th>
+                        <th onClick={() => handleLogSort('ip')} className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors">
+                          IP Address {renderLogSortIcon('ip')}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-850">
-                      {filteredLogs.length === 0 ? (
+                      {paginatedLogs.length === 0 ? (
                         <tr>
-                          <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                          <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
                             {logs.length === 0 ? 'No public API traffic logged yet.' : 'No logs match your filters.'}
                           </td>
                         </tr>
                       ) : (
-                        filteredLogs.map(log => (
+                        paginatedLogs.map(log => (
                           <tr key={log._id} className="hover:bg-gray-800/10 transition-colors">
                             <td className="px-6 py-4 text-xs text-gray-400 font-mono">{formatDate(log.timestamp)}</td>
                             <td className="px-6 py-4 font-medium text-gray-200">{log.appName}</td>
@@ -918,6 +994,30 @@ export default function AdminDashboard() {
                                 {log.returnedType}
                               </span>
                             </td>
+                            <td className="px-6 py-4 max-w-xs xl:max-w-md truncate text-xs text-gray-300" title={
+                              log.returnedType === 'question' 
+                                ? `Q: ${log.returnedQuestionText || ''}` 
+                                : log.returnedType === 'answer' 
+                                  ? `Q: ${log.returnedQuestionText || ''}\nA: ${log.returnedAnswerText || ''}`
+                                  : ''
+                            }>
+                              {log.returnedType === 'question' && log.returnedQuestionText && (
+                                <div className="text-cyan-400 font-medium truncate">Q: {log.returnedQuestionText}</div>
+                              )}
+                              {log.returnedType === 'answer' && (
+                                <div className="space-y-0.5 truncate">
+                                  {log.returnedQuestionText && (
+                                    <div className="text-cyan-400/70 text-[10px] truncate">Q: {log.returnedQuestionText}</div>
+                                  )}
+                                  {log.returnedAnswerText && (
+                                    <div className="text-emerald-400 font-medium truncate">A: {log.returnedAnswerText}</div>
+                                  )}
+                                </div>
+                              )}
+                              {log.returnedType !== 'question' && log.returnedType !== 'answer' && (
+                                <span className="text-gray-500">-</span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 font-mono text-xs text-gray-400">
                               {log.returnedType === 'reset' ? '-' : `Q: ${log.returnedQuestionIndex ?? 0} | A: ${log.returnedAnswerIndex !== null ? log.returnedAnswerIndex : '-'}`}
                             </td>
@@ -927,6 +1027,61 @@ export default function AdminDashboard() {
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-900/10 px-6 py-4 rounded-xl border border-gray-800/40 text-sm text-gray-400 font-medium">
+                  <div className="flex items-center gap-4">
+                    <span>
+                      Showing <span className="font-semibold text-white">{totalLogs === 0 ? 0 : startIndex + 1}</span> to{' '}
+                      <span className="font-semibold text-white">{Math.min(startIndex + logRowsPerPage, totalLogs)}</span> of{' '}
+                      <span className="font-semibold text-white">{totalLogs}</span> entries
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span>Rows:</span>
+                      <select
+                        value={logRowsPerPage}
+                        onChange={(e) => {
+                          setLogRowsPerPage(Number(e.target.value));
+                          setLogCurrentPage(1);
+                        }}
+                        className="bg-gray-950 border border-gray-800 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none cursor-pointer font-semibold"
+                      >
+                        {[5, 10, 20, 50, 100].map(val => (
+                          <option key={val} value={val}>{val}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setLogCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="p-1.5 bg-gray-950 hover:bg-gray-900 border border-gray-800 rounded-lg text-gray-400 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-gray-950 cursor-pointer"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setLogCurrentPage(page)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          currentPage === page 
+                            ? 'bg-indigo-650 text-white font-bold border border-indigo-500' 
+                            : 'bg-gray-950 border border-gray-800 text-gray-400 hover:text-white hover:bg-gray-900'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setLogCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="p-1.5 bg-gray-950 hover:bg-gray-900 border border-gray-800 rounded-lg text-gray-400 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-gray-950 cursor-pointer"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
