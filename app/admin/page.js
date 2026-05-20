@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import Link from 'next/link';
-import { Eye, Trash2, Shield, Activity, ListFilter, Users, RefreshCw, Search, X } from 'lucide-react';
+import { Eye, Trash2, Shield, Activity, ListFilter, Users, RefreshCw, Search, X, Plus, Edit, ArrowUpDown, ChevronLeft, ChevronRight, User, Key, LayoutGrid } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AdminDashboard() {
@@ -15,8 +15,38 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
 
+  // Track client-side time to prevent hydration mismatch and comply with purity rules
+  const [now, setNow] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setNow(Date.now());
+    }, 0);
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 30000); // update every 30 seconds
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Overview Tab Filters
   const [overviewSearch, setOverviewSearch] = useState('');
+
+  // Users Tab Datatable States
+  const [userSearch, setUserSearch] = useState('');
+  const [userSortColumn, setUserSortColumn] = useState('email');
+  const [userSortDirection, setUserSortDirection] = useState('asc');
+  const [userCurrentPage, setUserCurrentPage] = useState(1);
+  const [userRowsPerPage, setUserRowsPerPage] = useState(5);
+
+  // User Modals & Forms
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userFormData, setUserFormData] = useState({ email: '', password: '', role: 'User' });
+  const [isSubmittingUser, setIsSubmittingUser] = useState(false);
 
   // Agent Tab Filters
   const [agentSearch, setAgentSearch] = useState('');
@@ -31,9 +61,8 @@ export default function AdminDashboard() {
   const [sessionSearch, setSessionSearch] = useState('');
   const [sessionModeFilter, setSessionModeFilter] = useState('all');
 
-  useEffect(() => {
-    fetchTabContent();
-    // Reset filters on tab change
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
     setOverviewSearch('');
     setAgentSearch('');
     setAgentStatusFilter('all');
@@ -42,7 +71,9 @@ export default function AdminDashboard() {
     setLogReturnedTypeFilter('all');
     setSessionSearch('');
     setSessionModeFilter('all');
-  }, [activeTab]);
+    setUserSearch('');
+    setUserCurrentPage(1);
+  };
 
   const fetchTabContent = async () => {
     setLoading(true);
@@ -54,6 +85,9 @@ export default function AdminDashboard() {
         ]);
         setUsers(userRes.data.data || []);
         setApps(appRes.data.data || []);
+      } else if (activeTab === 'users') {
+        const res = await api.get('/admin/users');
+        setUsers(res.data.data || []);
       } else if (activeTab === 'agents') {
         const res = await api.get('/admin/agents');
         setAgents(res.data.data || []);
@@ -70,6 +104,14 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTabContent();
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const deleteApp = async (id) => {
     if (deletingId) return;
@@ -96,7 +138,7 @@ export default function AdminDashboard() {
   const isAgentOnline = (agent) => {
     if (!agent.lastSeenAt) return false;
     const lastActive = new Date(agent.lastSeenAt).getTime();
-    return (Date.now() - lastActive) < 300000; // 5 minutes
+    return (now - lastActive) < 300000; // 5 minutes
   };
 
   return (
@@ -116,7 +158,8 @@ export default function AdminDashboard() {
       {/* Tabs */}
       <div className="flex border-b border-gray-850 gap-6">
         {[
-          { id: 'overview', label: 'Apps Overview', icon: Users },
+          { id: 'overview', label: 'Apps Overview', icon: LayoutGrid },
+          { id: 'users', label: 'User Accounts', icon: Users },
           { id: 'agents', label: 'Agent Monitoring', icon: Activity },
           { id: 'logs', label: 'API Request Logs', icon: ListFilter },
           { id: 'sessions', label: 'Live App Sessions', icon: RefreshCw }
@@ -125,7 +168,7 @@ export default function AdminDashboard() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`pb-3 text-sm font-medium transition-all flex items-center gap-2 border-b-2 -mb-[2px] ${
                 activeTab === tab.id 
                   ? 'text-indigo-400 border-indigo-500 font-semibold' 
@@ -238,6 +281,416 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </>
+            );
+          })()}
+
+          {/* USERS TAB */}
+          {activeTab === 'users' && (() => {
+            // Handlers
+            const handleCreateUserSubmit = async (e) => {
+              e.preventDefault();
+              if (!userFormData.email || !userFormData.password) {
+                toast.error('Email and Password are required');
+                return;
+              }
+              setIsSubmittingUser(true);
+              try {
+                const res = await api.post('/admin/users', userFormData);
+                if (res.data.success) {
+                  setUsers([res.data.data, ...users]);
+                  toast.success('User created successfully');
+                  setIsCreateModalOpen(false);
+                  setUserFormData({ email: '', password: '', role: 'User' });
+                }
+              } catch (error) {
+                toast.error(error.response?.data?.message || 'Failed to create user');
+              } finally {
+                setIsSubmittingUser(false);
+              }
+            };
+
+            const openEditModal = (u) => {
+              setEditingUser(u);
+              setUserFormData({ email: u.email, password: '', role: u.role });
+              setIsEditModalOpen(true);
+            };
+
+            const handleEditUserSubmit = async (e) => {
+              e.preventDefault();
+              if (!userFormData.email) {
+                toast.error('Email is required');
+                return;
+              }
+              setIsSubmittingUser(true);
+              try {
+                const res = await api.put(`/admin/users/${editingUser._id}`, userFormData);
+                if (res.data.success) {
+                  setUsers(users.map(u => u._id === editingUser._id ? { ...u, email: userFormData.email, role: userFormData.role } : u));
+                  toast.success('User updated successfully');
+                  setIsEditModalOpen(false);
+                  setEditingUser(null);
+                  setUserFormData({ email: '', password: '', role: 'User' });
+                }
+              } catch (error) {
+                toast.error(error.response?.data?.message || 'Failed to update user');
+              } finally {
+                setIsSubmittingUser(false);
+              }
+            };
+
+            const handleDeleteUser = async (id) => {
+              if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+              try {
+                const res = await api.delete(`/admin/users/${id}`);
+                if (res.data.success) {
+                  setUsers(users.filter(u => u._id !== id));
+                  toast.success('User deleted successfully');
+                }
+              } catch (error) {
+                toast.error(error.response?.data?.message || 'Failed to delete user');
+              }
+            };
+
+            const handleSort = (columnName) => {
+              if (userSortColumn === columnName) {
+                setUserSortDirection(userSortDirection === 'asc' ? 'desc' : 'asc');
+              } else {
+                setUserSortColumn(columnName);
+                setUserSortDirection('asc');
+              }
+              setUserCurrentPage(1);
+            };
+
+            const renderSortIcon = (columnName) => {
+              if (userSortColumn !== columnName) return <ArrowUpDown size={13} className="text-gray-500 ml-1.5 inline" />;
+              return userSortDirection === 'asc' 
+                ? <span className="text-indigo-400 ml-1.5 font-bold">▲</span> 
+                : <span className="text-indigo-400 ml-1.5 font-bold">▼</span>;
+            };
+
+            // Filter & Sort Logic
+            const filteredUsers = users.filter(u => {
+              const query = userSearch.toLowerCase();
+              return u.email.toLowerCase().includes(query) || u.role.toLowerCase().includes(query);
+            });
+
+            const sortedUsers = [...filteredUsers].sort((a, b) => {
+              let aVal = a[userSortColumn] || '';
+              let bVal = b[userSortColumn] || '';
+              
+              if (userSortColumn === 'createdAt') {
+                aVal = aVal ? new Date(aVal).getTime() : 0;
+                bVal = bVal ? new Date(bVal).getTime() : 0;
+              } else {
+                aVal = String(aVal).toLowerCase();
+                bVal = String(bVal).toLowerCase();
+              }
+
+              if (aVal < bVal) return userSortDirection === 'asc' ? -1 : 1;
+              if (aVal > bVal) return userSortDirection === 'asc' ? 1 : -1;
+              return 0;
+            });
+
+            // Pagination Calculations
+            const totalUsers = sortedUsers.length;
+            const totalPages = Math.ceil(totalUsers / userRowsPerPage) || 1;
+            const currentPage = Math.min(userCurrentPage, totalPages);
+            const startIndex = (currentPage - 1) * userRowsPerPage;
+            const paginatedUsers = sortedUsers.slice(startIndex, startIndex + userRowsPerPage);
+
+            return (
+              <div className="space-y-6">
+                {/* Search & Actions Bar */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-900/30 p-4 rounded-xl border border-gray-800 backdrop-blur-sm">
+                  <h2 className="text-xl font-bold text-white">User Accounts</h2>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                      <input
+                        type="text"
+                        placeholder="Search users by email or role..."
+                        className="w-full pl-9 pr-8 py-2 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300 placeholder:text-gray-500 focus:border-indigo-500 focus:outline-none transition-colors"
+                        value={userSearch}
+                        onChange={(e) => {
+                          setUserSearch(e.target.value);
+                          setUserCurrentPage(1);
+                        }}
+                      />
+                      {userSearch && (
+                        <button
+                          onClick={() => {
+                            setUserSearch('');
+                            setUserCurrentPage(1);
+                          }}
+                          className="absolute right-3 top-2.5 text-gray-500 hover:text-white transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setUserFormData({ email: '', password: '', role: 'User' });
+                        setIsCreateModalOpen(true);
+                      }}
+                      className="bg-indigo-650 hover:bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/20 transition-all cursor-pointer whitespace-nowrap"
+                    >
+                      <Plus size={16} /> Add User
+                    </button>
+                  </div>
+                </div>
+
+                {/* Datatable */}
+                <div className="overflow-x-auto rounded-xl border border-gray-800 bg-gray-900/30 backdrop-blur-sm">
+                  <table className="w-full text-left text-sm text-gray-300">
+                    <thead className="bg-gray-800/40 text-gray-400 border-b border-gray-850 select-none">
+                      <tr>
+                        <th 
+                          onClick={() => handleSort('email')} 
+                          className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors"
+                        >
+                          Email {renderSortIcon('email')}
+                        </th>
+                        <th 
+                          onClick={() => handleSort('role')} 
+                          className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors"
+                        >
+                          Role {renderSortIcon('role')}
+                        </th>
+                        <th 
+                          onClick={() => handleSort('createdAt')} 
+                          className="px-6 py-4 font-medium cursor-pointer hover:text-indigo-400 transition-colors"
+                        >
+                          Created {renderSortIcon('createdAt')}
+                        </th>
+                        <th className="px-6 py-4 font-medium text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-850">
+                      {paginatedUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
+                            {users.length === 0 ? 'No user accounts found.' : 'No users match your search criteria.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedUsers.map(u => (
+                          <tr key={u._id} className="hover:bg-gray-800/10 transition-colors">
+                            <td className="px-6 py-4 font-medium text-white">{u.email}</td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                u.role === 'Admin' 
+                                  ? 'bg-purple-950/50 text-purple-400 border border-purple-500/20' 
+                                  : 'bg-gray-800/50 text-gray-400 border border-gray-700/20'
+                              }`}>
+                                {u.role}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-xs text-gray-400">{formatDate(u.createdAt)}</td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="inline-flex gap-2">
+                                <button
+                                  onClick={() => openEditModal(u)}
+                                  className="text-indigo-400 hover:text-indigo-300 p-1.5 rounded hover:bg-indigo-950/20 transition-colors cursor-pointer"
+                                  title="Edit User"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(u._id)}
+                                  className="text-red-400 hover:text-red-300 p-1.5 rounded hover:bg-red-950/20 transition-colors cursor-pointer"
+                                  title="Delete User"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-900/10 px-6 py-4 rounded-xl border border-gray-800/40 text-sm text-gray-400 font-medium">
+                  <div className="flex items-center gap-4">
+                    <span>
+                      Showing <span className="font-semibold text-white">{totalUsers === 0 ? 0 : startIndex + 1}</span> to{' '}
+                      <span className="font-semibold text-white">{Math.min(startIndex + userRowsPerPage, totalUsers)}</span> of{' '}
+                      <span className="font-semibold text-white">{totalUsers}</span> entries
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span>Rows:</span>
+                      <select
+                        value={userRowsPerPage}
+                        onChange={(e) => {
+                          setUserRowsPerPage(Number(e.target.value));
+                          setUserCurrentPage(1);
+                        }}
+                        className="bg-gray-950 border border-gray-800 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none cursor-pointer font-semibold"
+                      >
+                        {[5, 10, 20, 50].map(val => (
+                          <option key={val} value={val}>{val}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setUserCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="p-1.5 bg-gray-950 hover:bg-gray-900 border border-gray-800 rounded-lg text-gray-400 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-gray-950 cursor-pointer"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setUserCurrentPage(page)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          currentPage === page 
+                            ? 'bg-indigo-650 text-white font-bold border border-indigo-500' 
+                            : 'bg-gray-950 border border-gray-800 text-gray-400 hover:text-white hover:bg-gray-900'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setUserCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="p-1.5 bg-gray-950 hover:bg-gray-900 border border-gray-800 rounded-lg text-gray-400 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-gray-950 cursor-pointer"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* CREATE USER MODAL */}
+                {isCreateModalOpen && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="relative w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl space-y-6">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <Plus size={20} className="text-indigo-400" /> Add New User
+                        </h3>
+                        <button onClick={() => setIsCreateModalOpen(false)} className="text-gray-400 hover:text-white transition-colors cursor-pointer">
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <form onSubmit={handleCreateUserSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-gray-405 uppercase tracking-wider flex items-center gap-1.5"><User size={12} /> Email Address</label>
+                          <input
+                            type="email"
+                            required
+                            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-300 placeholder:text-gray-600 focus:border-indigo-500 focus:outline-none transition-colors"
+                            placeholder="user@example.com"
+                            value={userFormData.email}
+                            onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-gray-405 uppercase tracking-wider flex items-center gap-1.5"><Key size={12} /> Password</label>
+                          <input
+                            type="password"
+                            required
+                            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-300 placeholder:text-gray-600 focus:border-indigo-500 focus:outline-none transition-colors"
+                            placeholder="••••••••"
+                            value={userFormData.password}
+                            onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-gray-405 uppercase tracking-wider flex items-center gap-1.5"><Shield size={12} /> Account Role</label>
+                          <select
+                            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-300 focus:border-indigo-500 focus:outline-none transition-colors cursor-pointer"
+                            value={userFormData.role}
+                            onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })}
+                          >
+                            <option value="User">User</option>
+                            <option value="Admin">Admin</option>
+                          </select>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={isSubmittingUser}
+                          className="w-full bg-indigo-650 hover:bg-indigo-600 text-white text-sm font-semibold py-3 rounded-xl shadow-lg shadow-indigo-950/20 transition-all flex justify-center items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {isSubmittingUser ? (
+                            <div className="animate-spin h-4.5 w-4.5 border-2 border-white border-t-transparent rounded-full" />
+                          ) : (
+                            'Create Account'
+                          )}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {/* EDIT USER MODAL */}
+                {isEditModalOpen && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="relative w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl space-y-6">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <Edit size={18} className="text-indigo-400" /> Edit User Account
+                        </h3>
+                        <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-white transition-colors cursor-pointer">
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <form onSubmit={handleEditUserSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-gray-405 uppercase tracking-wider flex items-center gap-1.5"><User size={12} /> Email Address</label>
+                          <input
+                            type="email"
+                            required
+                            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-300 focus:border-indigo-500 focus:outline-none transition-colors"
+                            placeholder="user@example.com"
+                            value={userFormData.email}
+                            onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-gray-405 uppercase tracking-wider flex items-center gap-1.5"><Key size={12} /> New Password</label>
+                          <input
+                            type="password"
+                            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-300 placeholder:text-gray-600 focus:border-indigo-500 focus:outline-none transition-colors"
+                            placeholder="Leave blank to keep existing password"
+                            value={userFormData.password}
+                            onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+                          />
+                          <p className="text-xs text-gray-500">Only input password if you want to change it.</p>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-gray-405 uppercase tracking-wider flex items-center gap-1.5"><Shield size={12} /> Account Role</label>
+                          <select
+                            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-300 focus:border-indigo-500 focus:outline-none transition-colors cursor-pointer"
+                            value={userFormData.role}
+                            onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })}
+                          >
+                            <option value="User">User</option>
+                            <option value="Admin">Admin</option>
+                          </select>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={isSubmittingUser}
+                          className="w-full bg-indigo-650 hover:bg-indigo-600 text-white text-sm font-semibold py-3 rounded-xl shadow-lg shadow-indigo-950/20 transition-all flex justify-center items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {isSubmittingUser ? (
+                            <div className="animate-spin h-4.5 w-4.5 border-2 border-white border-t-transparent rounded-full" />
+                          ) : (
+                            'Save Changes'
+                          )}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })()}
 

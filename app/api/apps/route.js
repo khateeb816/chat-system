@@ -63,7 +63,8 @@ export async function POST(request) {
       currentQuestionIndex: 0,
       currentAnswerIndex: 0,
       currentMode: 'question',
-      totalApiCalls: 0
+      totalApiCalls: 0,
+      usedQuestions: []
     });
 
     await db.collection('activityLogs').add({

@@ -51,13 +51,16 @@ export async function GET(request, { params }) {
     const progressSnapshot = await db.collection('appProgress').where('appId', '==', appId).limit(1).get();
 
     if (progressSnapshot.empty) {
+      const randomIndex = Math.floor(Math.random() * questions.length);
+      const selectedQuestion = questions[randomIndex];
       const newProgress = {
         appId,
-        currentQuestionIndex: 0,
+        currentQuestionIndex: randomIndex,
         currentAnswerIndex: 0,
         currentMode: 'question',
         totalApiCalls: 0,
-        lastAccessedAt: new Date().toISOString()
+        lastAccessedAt: new Date().toISOString(),
+        usedQuestions: [selectedQuestion._id]
       };
       progressRef = await db.collection('appProgress').add(newProgress);
       progress = newProgress;
@@ -69,13 +72,15 @@ export async function GET(request, { params }) {
     let { currentQuestionIndex, currentAnswerIndex, currentMode } = progress;
     const newTotalCalls = (progress.totalApiCalls || 0) + 1;
 
-    if (currentQuestionIndex >= questions.length) {
-      currentQuestionIndex = 0;
+    let currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) {
+      const randomIndex = Math.floor(Math.random() * questions.length);
+      currentQuestionIndex = randomIndex;
+      currentQuestion = questions[randomIndex];
       currentAnswerIndex = 0;
       currentMode = 'question';
     }
 
-    const currentQuestion = questions[currentQuestionIndex];
     let responseData = {};
     
     // Prepare session and serving history (for self-response prevention architecture)
@@ -105,6 +110,7 @@ export async function GET(request, { params }) {
       newProgress.currentMode = 'answer';
       newProgress.currentQuestionIndex = currentQuestionIndex;
       newProgress.currentAnswerIndex = currentAnswerIndex;
+      newProgress.usedQuestions = progress.usedQuestions || [currentQuestion._id];
     } else {
       const answers = currentQuestion.answers || [];
 
@@ -119,20 +125,56 @@ export async function GET(request, { params }) {
 
         const nextAnswerIndex = currentAnswerIndex + 1;
         if (nextAnswerIndex >= answers.length) {
-          let nextQuestionIndex = currentQuestionIndex + 1;
-          if (nextQuestionIndex >= questions.length) nextQuestionIndex = 0;
+          // Select next random question since all answers are complete
+          let usedQuestions = progress.usedQuestions || [];
+          if (!usedQuestions.includes(currentQuestion._id)) {
+            usedQuestions.push(currentQuestion._id);
+          }
+
+          let unusedQuestions = questions.filter(q => !usedQuestions.includes(q._id));
+          if (unusedQuestions.length === 0) {
+            usedQuestions = [];
+            if (questions.length > 1) {
+              unusedQuestions = questions.filter(q => q._id !== currentQuestion._id);
+            } else {
+              unusedQuestions = questions;
+            }
+          }
+
+          const randomIndex = Math.floor(Math.random() * unusedQuestions.length);
+          const nextQuestion = unusedQuestions[randomIndex];
+          const nextQuestionIndex = questions.findIndex(q => q._id === nextQuestion._id);
+
           newProgress.currentQuestionIndex = nextQuestionIndex;
           newProgress.currentAnswerIndex = 0;
           newProgress.currentMode = 'question';
+          newProgress.usedQuestions = [...usedQuestions, nextQuestion._id];
         } else {
           newProgress.currentQuestionIndex = currentQuestionIndex;
           newProgress.currentAnswerIndex = nextAnswerIndex;
           newProgress.currentMode = 'answer';
+          newProgress.usedQuestions = progress.usedQuestions || [currentQuestion._id];
         }
       } else {
-        let nextQuestionIndex = currentQuestionIndex + 1;
-        if (nextQuestionIndex >= questions.length) nextQuestionIndex = 0;
-        const nextQuestion = questions[nextQuestionIndex];
+        // Fallback if no answers exist for the question
+        let usedQuestions = progress.usedQuestions || [];
+        if (!usedQuestions.includes(currentQuestion._id)) {
+          usedQuestions.push(currentQuestion._id);
+        }
+
+        let unusedQuestions = questions.filter(q => !usedQuestions.includes(q._id));
+        if (unusedQuestions.length === 0) {
+          usedQuestions = [];
+          if (questions.length > 1) {
+            unusedQuestions = questions.filter(q => q._id !== currentQuestion._id);
+          } else {
+            unusedQuestions = questions;
+          }
+        }
+
+        const randomIndex = Math.floor(Math.random() * unusedQuestions.length);
+        const nextQuestion = unusedQuestions[randomIndex];
+        const nextQuestionIndex = questions.findIndex(q => q._id === nextQuestion._id);
 
         responseData = {
           success: true,
@@ -143,6 +185,7 @@ export async function GET(request, { params }) {
         newProgress.currentQuestionIndex = nextQuestionIndex;
         newProgress.currentAnswerIndex = 0;
         newProgress.currentMode = 'answer';
+        newProgress.usedQuestions = [...usedQuestions, nextQuestion._id];
       }
     }
 

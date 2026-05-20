@@ -36,7 +36,8 @@ export async function POST(request, { params }) {
         currentMode: 'question',
         currentServingAgentId: agentId,
         lastServedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        usedQuestions: []
       });
     }
 
