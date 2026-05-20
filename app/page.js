@@ -259,7 +259,7 @@ export default function Home() {
                           </p>
                           <div className="mt-3">
                             <a
-                              href="https://github.com/khateeb816/chat-system/releases/download/v1.0/extension.zip"
+                              href="https://github.com/khateeb816/chat-system/releases/download/v1.1/extension.zip"
                               className="inline-flex items-center gap-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl transition-all shadow-md"
                             >
                               <Download size={14} /> Download extension.zip
