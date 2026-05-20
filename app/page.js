@@ -49,9 +49,7 @@ export default function Home() {
           Chat System
         </Link>
         <nav className="flex items-center gap-6">
-          {loading ? (
-            <div className="h-8 w-20 bg-gray-800 rounded-full animate-pulse"></div>
-          ) : user ? (
+          {(!loading && user) ? (
             <Link href="/dashboard" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-full hover:bg-indigo-700 transition-colors">Dashboard</Link>
           ) : (
             <>
@@ -77,9 +75,7 @@ export default function Home() {
         </p>
         
         <div className="mt-10 flex items-center gap-4 relative z-10">
-          {loading ? (
-            <div className="h-14 w-48 bg-indigo-600/50 rounded-full animate-pulse"></div>
-          ) : user ? (
+          {(!loading && user) ? (
             <Link href="/dashboard" className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-full font-medium hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95 shadow-xl shadow-indigo-900/20">
               Go to Dashboard <ArrowRight size={18} />
             </Link>

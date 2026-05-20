@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, Trash2, Edit2, Play, RotateCcw, Copy, Search, X, Upload } from 'lucide-react';
+import { Plus, Trash2, Edit2, Play, RotateCcw, Copy, Search, X, Upload, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AppDetail() {
@@ -34,6 +34,73 @@ export default function AppDetail() {
   const [isSaving, setIsSaving] = useState(false);
   const [deletingQuestionId, setDeletingQuestionId] = useState(null);
   const [agentId, setAgentId] = useState('');
+
+  // Export states & functions
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+
+  const exportAsJSON = () => {
+    setIsExportDropdownOpen(false);
+    if (questions.length === 0) {
+      toast.error("No questions to export");
+      return;
+    }
+
+    const exportData = questions.map((q) => ({
+      text: q.text,
+      answers: q.answers.map((a) => a.text)
+    }));
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${app?.name?.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "app"}-questions.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Questions exported as JSON!");
+  };
+
+  const exportAsTXT = () => {
+    setIsExportDropdownOpen(false);
+    if (questions.length === 0) {
+      toast.error("No questions to export");
+      return;
+    }
+
+    let txtContent = `Questions & Answers Sequence for App: ${app?.name || "App"}\n`;
+    txtContent += `Description: ${app?.description || "No description"}\n`;
+    txtContent += `Generated on: ${new Date().toLocaleString()}\n`;
+    txtContent += `Total Questions: ${questions.length}\n`;
+    txtContent += `================================================================================\n\n`;
+
+    questions.forEach((q, idx) => {
+      txtContent += `${idx + 1}. Question: ${q.text}\n`;
+      if (q.answers && q.answers.length > 0) {
+        q.answers.forEach((a, aidx) => {
+          txtContent += `   A${aidx + 1}. ${a.text}\n`;
+        });
+      } else {
+        txtContent += `   (No answers defined)\n`;
+      }
+      txtContent += `\n`;
+    });
+
+    const blob = new Blob([txtContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${app?.name?.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "app"}-questions.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Questions exported as Plain Text!");
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -348,6 +415,33 @@ export default function AppDetail() {
             >
               <Upload size={16} /> Import
             </button>
+            
+            {/* Export Dropdown */}
+            <div className="relative" onBlur={() => setTimeout(() => setIsExportDropdownOpen(false), 200)}>
+              <button
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                className="flex items-center gap-2 rounded-lg bg-gray-800 border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+              >
+                <Download size={16} /> Export
+              </button>
+              {isExportDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-800 bg-gray-900 shadow-xl z-20 py-1">
+                  <button
+                    onClick={exportAsJSON}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                  >
+                    Export as JSON (.json)
+                  </button>
+                  <button
+                    onClick={exportAsTXT}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                  >
+                    Export as Plain Text (.txt)
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
               <Plus size={16} /> Add Question
             </button>
