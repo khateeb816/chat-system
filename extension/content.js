@@ -55,15 +55,31 @@ function stopLoop() {
 function scheduleNext(apiUrl) {
   if (!isRunning) return;
 
-  // 30 to 50 seconds random interval
-  const minInterval = 30000;
-  const maxInterval = 50000;
-  const delay = Math.floor(Math.random() * (maxInterval - minInterval)) + minInterval;
-  
-  activeTimeout = setTimeout(() => {
+  chrome.storage.local.get(['minDelay', 'maxDelay'], (result) => {
     if (!isRunning) return;
-    executeAction(apiUrl);
-  }, delay);
+
+    // Load custom values or fall back to defaults (60s min, 120s max)
+    const minSec = result.minDelay !== undefined ? Number(result.minDelay) : 60;
+    const maxSec = result.maxDelay !== undefined ? Number(result.maxDelay) : 120;
+
+    // Convert to milliseconds
+    const minInterval = Math.max(1, minSec) * 1000;
+    const maxInterval = Math.max(1, maxSec) * 1000;
+
+    // Safely compute the min and max limits
+    const actualMin = Math.min(minInterval, maxInterval);
+    const actualMax = Math.max(minInterval, maxInterval);
+
+    // Calculate a random delay between the limits
+    const delay = Math.floor(Math.random() * (actualMax - actualMin)) + actualMin;
+    
+    console.log(`[YT Chat Assistant] Next fetch scheduled in ${(delay / 1000).toFixed(1)} seconds (Active Range: ${minSec}s - ${maxSec}s)`);
+
+    activeTimeout = setTimeout(() => {
+      if (!isRunning) return;
+      executeAction(apiUrl);
+    }, delay);
+  });
 }
 
 function executeAction(apiUrl) {

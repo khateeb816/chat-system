@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const apiUrlInput = document.getElementById('api-url');
+  const minDelayInput = document.getElementById('min-delay');
+  const maxDelayInput = document.getElementById('max-delay');
   const saveBtn = document.getElementById('save-btn');
   const toggleBtn = document.getElementById('toggle-btn');
   const statusDisplay = document.getElementById('status-display');
@@ -7,10 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const lastMsgLog = document.getElementById('last-msg-log');
 
   // Load existing configuration
-  chrome.storage.local.get(['apiUrl', 'active', 'lastSent', 'lastMessage'], (result) => {
+  chrome.storage.local.get(['apiUrl', 'active', 'lastSent', 'lastMessage', 'minDelay', 'maxDelay'], (result) => {
     if (result.apiUrl) {
       apiUrlInput.value = result.apiUrl;
     }
+    
+    // Set user values or defaults (60s min, 120s max)
+    minDelayInput.value = result.minDelay !== undefined ? result.minDelay : 60;
+    maxDelayInput.value = result.maxDelay !== undefined ? result.maxDelay : 120;
+
     if (result.active) {
       setUIStateActive(true);
     } else {
@@ -24,22 +31,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Save API URL
+  // Save Config
   saveBtn.addEventListener('click', () => {
     const url = apiUrlInput.value.trim();
+    const minVal = parseInt(minDelayInput.value.trim(), 10);
+    const maxVal = parseInt(maxDelayInput.value.trim(), 10);
+
     if (!url) {
       alert('Please enter a valid API URL');
       return;
     }
-    chrome.storage.local.set({ apiUrl: url }, () => {
-      const originalText = saveBtn.textContent;
-      saveBtn.textContent = 'Saved!';
-      saveBtn.style.background = 'var(--success-color)';
-      setTimeout(() => {
-        saveBtn.textContent = originalText;
-        saveBtn.style.background = '';
-      }, 1000);
-    });
+
+    if (isNaN(minVal) || minVal <= 0) {
+      alert('Please enter a valid positive number for Min Delay');
+      return;
+    }
+
+    if (isNaN(maxVal) || maxVal <= 0) {
+      alert('Please enter a valid positive number for Max Delay');
+      return;
+    }
+
+    if (minVal > maxVal) {
+      alert('Min Delay cannot be greater than Max Delay');
+      return;
+    }
+
+    // Extract API origin for dynamic permission request
+    let origin = '';
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+        origin = `${parsedUrl.protocol}//${parsedUrl.hostname}/`;
+      }
+    } catch (e) {
+      alert('Please enter a valid API URL starting with http:// or https://');
+      return;
+    }
+
+    const saveConfigAndNotify = () => {
+      chrome.storage.local.set({ 
+        apiUrl: url,
+        minDelay: minVal,
+        maxDelay: maxVal
+      }, () => {
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = 'Saved!';
+        saveBtn.style.background = 'var(--success-color)';
+        setTimeout(() => {
+          saveBtn.textContent = originalText;
+          saveBtn.style.background = '';
+        }, 1000);
+      });
+    };
+
+    if (origin) {
+      // Request permission dynamically for this API origin to stay store-compliant
+      chrome.permissions.request({
+        origins: [origin]
+      }, (granted) => {
+        if (granted) {
+          saveConfigAndNotify();
+        } else {
+          const saveAnyway = confirm('Access to the API host was not granted. The extension will not be able to fetch messages unless host permissions are allowed. Save configuration anyway?');
+          if (saveAnyway) {
+            saveConfigAndNotify();
+          }
+        }
+      });
+    } else {
+      saveConfigAndNotify();
+    }
   });
 
   // Toggle activation state

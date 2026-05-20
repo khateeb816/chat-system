@@ -1,17 +1,30 @@
 {
   "manifest_version": 3,
-  "name": "YouTube Live Chat Assistant",
+  "name": "Live Chat Assistant for YouTube™",
   "version": "1.0",
-  "description": "Automates sending messages to YouTube Live Chat by fetching them from a custom API.",
+  "description": "Integrate and stream messages from custom API endpoints directly into YouTube live streams for testing and presentation.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "permissions": [
     "storage"
   ],
   "host_permissions": [
+    "https://www.youtube.com/"
+  ],
+  "optional_host_permissions": [
     "http://*/*",
     "https://*/*"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
