@@ -10,6 +10,10 @@ export default function Home() {
   const [mockActive, setMockActive] = useState(false);
   const [mockMessage, setMockMessage] = useState("Waiting for response data...");
   const [mockLastSentTime, setMockLastSentTime] = useState("—");
+  const [apiUrl, setApiUrl] = useState("");
+  const [minDelay, setMinDelay] = useState("30");
+  const [maxDelay, setMaxDelay] = useState("60");
+  const [isConfigSaved, setIsConfigSaved] = useState(false);
 
   useEffect(() => {
     if (!mockActive) {
@@ -27,17 +31,57 @@ export default function Home() {
     ];
     let currentIndex = 0;
 
-    const simulateMessage = () => {
-      setMockMessage(messages[currentIndex]);
-      setMockLastSentTime(new Date().toLocaleTimeString());
-      currentIndex = (currentIndex + 1) % messages.length;
+    const fetchData = async () => {
+      if (!apiUrl) {
+        // Fallback simulation
+        setMockMessage(messages[currentIndex]);
+        setMockLastSentTime(new Date().toLocaleTimeString());
+        currentIndex = (currentIndex + 1) % messages.length;
+        return;
+      }
+
+      try {
+        setMockMessage("Fetching latest data from API...");
+        const res = await fetch(apiUrl);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        
+        let displayMsg = "";
+        if (data.success) {
+          if (data.type === "question") {
+            displayMsg = data.question;
+          } else if (data.type === "answer") {
+            displayMsg = data.answer;
+          } else {
+            displayMsg = JSON.stringify(data);
+          }
+        } else if (data.message) {
+          displayMsg = `API Message: ${data.message}`;
+        } else {
+          displayMsg = JSON.stringify(data);
+        }
+        
+        setMockMessage(displayMsg);
+        setMockLastSentTime(new Date().toLocaleTimeString());
+      } catch (err) {
+        setMockMessage(`Fetch Error: ${err.message || "Failed to connect"}. Make sure CORS is supported.`);
+        setMockLastSentTime(new Date().toLocaleTimeString());
+      }
     };
 
-    simulateMessage();
+    // Trigger immediate fetch on activation
+    fetchData();
 
-    const interval = setInterval(simulateMessage, 6000);
+    // Scale standard demo delay to keep interactive experience comfortable (3s to 8s)
+    const min = parseInt(minDelay) || 30;
+    const max = parseInt(maxDelay) || 60;
+    const baseInterval = Math.max(3000, Math.min(8000, ((min + Math.random() * (max - min)) / 10) * 1000));
+
+    const interval = setInterval(fetchData, baseInterval);
     return () => clearInterval(interval);
-  }, [mockActive]);
+  }, [mockActive, apiUrl, minDelay, maxDelay]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white selection:bg-indigo-500/30">
@@ -140,7 +184,7 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Column: CSS Mockup */}
             <div className="lg:col-span-5 flex justify-center">
-              <div className="w-[320px] bg-gradient-to-br from-[#090d16] to-[#111322] border border-gray-800/80 rounded-2xl p-5 shadow-2xl relative select-none">
+              <div className="w-[320px] bg-gradient-to-br from-[#090d16] to-[#111322] border border-gray-800/80 rounded-2xl p-5 shadow-2xl relative">
                 {/* Window controls representation */}
                 <div className="flex items-center justify-between pb-3 border-b border-gray-800/50 mb-4">
                   <div className="flex items-center gap-2">
@@ -162,17 +206,60 @@ export default function Home() {
                     </label>
                     <input
                       type="text"
-                      disabled
-                      className="w-full bg-gray-950/60 border border-gray-850 rounded-lg px-3 py-2 text-xs text-gray-400 outline-none"
-                      value="https://chat-system.vercel.app/api/public/..."
+                      className="w-full bg-gray-950/60 border border-gray-800/60 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 outline-none focus:border-indigo-500 transition-colors"
+                      value={apiUrl}
+                      onChange={(e) => setApiUrl(e.target.value)}
+                      placeholder="https://chat-system.vercel.app/api/public/..."
                     />
+                  </div>
+
+                  {/* Delay Configuration Group */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase tracking-wider block">
+                        Min Delay (sec)
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full bg-gray-950/60 border border-gray-800/60 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-indigo-500 transition-colors"
+                        value={minDelay}
+                        onChange={(e) => setMinDelay(e.target.value)}
+                        placeholder="30"
+                        min="1"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase tracking-wider block">
+                        Max Delay (sec)
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full bg-gray-950/60 border border-gray-800/60 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-indigo-500 transition-colors"
+                        value={maxDelay}
+                        onChange={(e) => setMaxDelay(e.target.value)}
+                        placeholder="60"
+                        min="1"
+                      />
+                    </div>
                   </div>
 
                   {/* Actions */}
                   <div className="grid grid-cols-1 gap-2">
-                    <div className="w-full text-center bg-indigo-600/10 border border-indigo-500/25 text-indigo-300 font-semibold py-2 rounded-lg text-xs">
-                      Config Saved
-                    </div>
+                    <button
+                      onClick={() => {
+                        setIsConfigSaved(true);
+                        setTimeout(() => setIsConfigSaved(false), 2000);
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 bg-indigo-650 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg text-xs cursor-pointer active:scale-95 transition-all duration-150 border border-indigo-600/30"
+                    >
+                      {isConfigSaved ? (
+                        <>
+                          <Check size={14} className="text-emerald-400" /> Config Saved!
+                        </>
+                      ) : (
+                        "Save Config"
+                      )}
+                    </button>
 
                     <button
                       onClick={() => setMockActive(!mockActive)}
@@ -330,9 +417,9 @@ export default function Home() {
                           2
                         </span>
                         <div>
-                          <h4 className="text-sm font-bold text-gray-200">Configure the Extension</h4>
+                          <h4 className="text-sm font-bold text-gray-200">Configure Extension &amp; Delays</h4>
                           <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                            Click the extension icon in your browser's toolbar, paste your API URL into the <strong>Message Fetch API URL</strong> input box, and press the <strong>Save Config</strong> button.
+                            Click the extension icon in your browser's toolbar, paste your API URL into the <strong>Message Fetch API URL</strong> input box, set your preferred <strong>Min Delay</strong> and <strong>Max Delay</strong> range (in seconds) to control chat message frequency, and press the <strong>Save Config</strong> button.
                           </p>
                         </div>
                       </div>
@@ -371,7 +458,7 @@ export default function Home() {
                         <div>
                           <h4 className="text-sm font-bold text-gray-200">Live Typing Autopilot</h4>
                           <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                            The extension will fetch sequential questions/answers from your API at random intervals (30-50 seconds) and simulate natural human typing into the chat box before sending it.
+                            The extension will fetch sequential questions/answers from your API at random intervals within your configured min/max delay range (e.g., 30-60 seconds) and simulate natural human typing into the chat box before sending it.
                           </p>
                         </div>
                       </div>
