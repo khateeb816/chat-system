@@ -125,6 +125,16 @@ export default function Home() {
             <p className="mt-4 text-gray-400 max-w-2xl mx-auto">
               Automate live streams by feeding sequential Q&As directly into YouTube Live Chat using our companion browser extension.
             </p>
+            <div className="mt-6 flex justify-center">
+              <a
+                href="https://chromewebstore.google.com/detail/live-chat-assistant-for-y/abclemlopopfdggmedddhjlehdjhkimm?authuser=0&hl=en"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 text-white font-semibold text-sm hover:from-indigo-600 hover:to-cyan-600 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-900/35 duration-200"
+              >
+                <Chrome size={16} /> Add to Chrome
+              </a>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -239,7 +249,7 @@ export default function Home() {
                   <div className="space-y-6 animate-fadeIn">
                     <h3 className="text-xl font-bold flex items-center gap-2 text-white">
                       <Chrome className="text-indigo-400" size={20} />
-                      Install Unpacked Extension
+                      Install from Chrome Web Store
                     </h3>
                     
                     <div className="relative border-l border-gray-800 pl-6 ml-3 space-y-6">
@@ -249,16 +259,18 @@ export default function Home() {
                           1
                         </span>
                         <div>
-                          <h4 className="text-sm font-bold text-gray-200">Download the Extension</h4>
+                          <h4 className="text-sm font-bold text-gray-200">Open Chrome Web Store</h4>
                           <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                            Click the button below to download the extension ZIP file containing the source files.
+                            Click the button below to visit the official listing page for the YouTube Live Chat Assistant.
                           </p>
                           <div className="mt-3">
                             <a
-                              href="https://github.com/khateeb816/chat-system/releases/download/v1.1/extension.zip"
+                              href="https://chromewebstore.google.com/detail/live-chat-assistant-for-y/abclemlopopfdggmedddhjlehdjhkimm?authuser=0&hl=en"
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="inline-flex items-center gap-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl transition-all shadow-md"
                             >
-                              <Download size={14} /> Download extension.zip
+                              Get Live Chat Assistant <ArrowRight size={14} />
                             </a>
                           </div>
                         </div>
@@ -270,9 +282,9 @@ export default function Home() {
                           2
                         </span>
                         <div>
-                          <h4 className="text-sm font-bold text-gray-200">Extract the Zip Archive</h4>
+                          <h4 className="text-sm font-bold text-gray-200">Add to your Browser</h4>
                           <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                            Unzip the downloaded <code className="bg-gray-900 px-1 py-0.5 rounded font-mono text-[11px] text-indigo-300">extension.zip</code> file into a dedicated directory on your computer (e.g., <code className="bg-gray-900 px-1 py-0.5 rounded font-mono text-[11px] text-gray-300">d:/youtube-chat-assistant</code>).
+                            Click the blue <strong>Add to Chrome</strong> (or <strong>Add extension</strong>) button in the Web Store interface. The extension will automatically download and install.
                           </p>
                         </div>
                       </div>
@@ -283,39 +295,9 @@ export default function Home() {
                           3
                         </span>
                         <div>
-                          <h4 className="text-sm font-bold text-gray-200">Open Browser Extensions Page</h4>
+                          <h4 className="text-sm font-bold text-gray-200">Pin for Quick Access</h4>
                           <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                            Open your web browser (Chrome, Edge, or Brave) and navigate to the Extensions page:
-                          </p>
-                          <ul className="mt-2 space-y-1 text-xs text-gray-400 list-disc pl-4">
-                            <li>Chrome: <code className="bg-gray-900 px-1 py-0.5 rounded font-mono text-[10px] text-gray-300">chrome://extensions/</code></li>
-                            <li>Edge: <code className="bg-gray-900 px-1 py-0.5 rounded font-mono text-[10px] text-gray-300">edge://extensions/</code></li>
-                          </ul>
-                        </div>
-                      </div>
-
-                      {/* Step 4 */}
-                      <div className="relative">
-                        <span className="absolute -left-9 top-0 flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600/40 text-xs font-bold text-indigo-300 border border-gray-950">
-                          4
-                        </span>
-                        <div>
-                          <h4 className="text-sm font-bold text-gray-200">Enable Developer Mode</h4>
-                          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                            Locate and toggle on the <strong>Developer mode</strong> switch, which is typically found in the top-right corner of the Extensions dashboard.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Step 5 */}
-                      <div className="relative">
-                        <span className="absolute -left-9 top-0 flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600/40 text-xs font-bold text-indigo-300 border border-gray-950">
-                          5
-                        </span>
-                        <div>
-                          <h4 className="text-sm font-bold text-gray-200">Upload Unpacked Extension</h4>
-                          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                            Click the <strong>Load unpacked</strong> button in the top-left, navigate to the folder where you extracted the extension, and select the folder (the folder must contain the <code className="bg-gray-900 px-1 py-0.5 rounded font-mono text-[11px] text-indigo-300">manifest.json</code> file).
+                            Click the extensions puzzle icon (<Puzzle size={12} className="inline-block text-indigo-400 align-text-top" />) in your browser's toolbar, locate <strong>Live Chat Assistant for YouTube</strong>, and click the pin icon so it stays easily accessible in your bar.
                           </p>
                         </div>
                       </div>
